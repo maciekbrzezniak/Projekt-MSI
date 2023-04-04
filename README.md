@@ -1,1 +1,1 @@
-# Metody sztuczenj inteligencji - projekt
+# Metody sztucznej inteligencji - projekt
