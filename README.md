@@ -1,1 +1,1 @@
-# Projekt-MSI
+# Metody sztuczenj inteligencji - projekt
