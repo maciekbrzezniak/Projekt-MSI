@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_classification
-from imblearn.over_sampling import SMOTE, RandomOverSampler
+from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split, StratifiedKFold, RepeatedStratifiedKFold
 from sklearn.metrics import f1_score
 from sklearn.naive_bayes import GaussianNB
@@ -40,6 +40,13 @@ X, y = make_classification(n_samples=12345, n_features=2, n_redundant=0,
                            n_clusters_per_class=1, weights=[class_proportion], flip_y=0,
                            random_state=12345)
 
+data = pd.read_csv('Projekt-MSI/dataset.csv')
+"""X2 = data.iloc[:, 2:]
+y2 = (data.iloc[:, 1] == 'Male').astype(int)"""
+
+X2 = data[['Gender', 'Age', 'Driving_License', 'Region_Code', 'Previously_Insured', 'Vehicle_Age', 'Vehicle_Damage', 'Annual_Premium', 'Policy_Sales_Channel', 'Vintage']]
+y2 = data['Response']
+
 dataset=pd.DataFrame(y)
 
 target_count = dataset.value_counts()
@@ -48,8 +55,6 @@ print('Class 1:', target_count[1])
 print('Proportion:', round(target_count[0] / target_count[1], 2), ': 1')
 
 ratio=0.7
-random = RandomOverSampler(sampling_strategy=ratio)
-X_rd, y_rd = random.fit_resample(X, y)
 
 smote = SMOTE(sampling_strategy=ratio)
 X_sm, y_sm = smote.fit_resample(X, y)
@@ -64,9 +69,9 @@ print('Class 1:', resample_count[1])
 print('Proportion:', round(resample_count[0] / resample_count[1], 2), ': 1')
 
 target_count.plot(kind='bar', title='Przed')
-plt.show()
+#plt.show()
 resample_count.plot(kind='bar', title='Po')
-plt.show()
+#plt.show()
 
 
 n_splits = 2
@@ -87,7 +92,7 @@ for train_index, test_index in rkf.split(X, y):
 mean_score = np.mean(scores)
 std_score = np.std(scores)
 
-print("F1 score: %.3f (%.3f)" % (mean_score, std_score))
+#print("F1 score: %.3f (%.3f)" % (mean_score, std_score))
 
 np.save('scores.npy', scores)
 
@@ -127,6 +132,8 @@ alpha = 0.05
 significant_advantage_matrix = (p_value_matrix < alpha)
 statistical_advantage_matrix = advantage_matrix * significant_advantage_matrix
 
+print("DANE SYSTETYCZNE:")
+print(' ')
 print(t_statistic_matrix)
 print(' ')
 print(p_value_matrix)
@@ -136,3 +143,51 @@ print(' ')
 print(significant_advantage_matrix)
 print(' ')
 print(statistical_advantage_matrix)
+
+random_scores2 = np.array([])
+smote_scores2 = np.array([])
+
+for train_index, test_index in rkf.split(X2, y2):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    
+    X_resampled_rd, y_resampled_rd = sampler.fit_resample(X_train, y_train)
+    clf.fit(X_resampled_rd, y_resampled_rd)
+    predict = clf.predict(X_test)
+    random_scores2 = np.append(random_scores2, f1_score(y_test, predict))
+    
+    X_resampled_sm, y_resampled_sm = smote.fit_resample(X_train, y_train)
+    clf.fit(X_resampled_sm, y_resampled_sm)
+    predict = clf.predict(X_test)
+    smote_scores2 = np.append(smote_scores2, f1_score(y_test, predict))
+
+
+scores_combo2 = np.column_stack((random_scores2, smote_scores2))
+
+num_classifiers2 = scores_combo2.shape[1]
+t_statistic_matrix2 = np.zeros((num_classifiers2, num_classifiers2))
+p_value_matrix2 = np.zeros((num_classifiers2, num_classifiers2))
+advantage_matrix2 = np.zeros((num_classifiers2, num_classifiers2), dtype=bool)
+
+for i in range(num_classifiers2):
+    for j in range(num_classifiers2):
+            t_statistic2, p_value2 = ttest_rel(scores_combo2[:, i], scores_combo2[:, j])
+            t_statistic_matrix2[i, j] = t_statistic2
+            p_value_matrix2[i, j] = p_value2
+            advantage_matrix2[i, j] = np.mean(scores_combo2[:, i]) > np.mean(scores_combo2[:, j])
+
+alpha = 0.05
+significant_advantage_matrix2 = (p_value_matrix2 < alpha)
+statistical_advantage_matrix2 = advantage_matrix2 * significant_advantage_matrix2
+
+print("DANE RZECZYWISTE:")
+print(' ')
+print(t_statistic_matrix2)
+print(' ')
+print(p_value_matrix2)
+print(' ')
+print(advantage_matrix2)
+print(' ')
+print(significant_advantage_matrix2)
+print(' ')
+print(statistical_advantage_matrix2)
