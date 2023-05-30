@@ -3,22 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_classification
 from imblearn.over_sampling import SMOTE, RandomOverSampler
-from sklearn.model_selection import train_test_split, StratifiedKFold
+from sklearn.model_selection import train_test_split, StratifiedKFold, RepeatedStratifiedKFold
 from sklearn.metrics import f1_score
 from sklearn.naive_bayes import GaussianNB
-
-def plot_2d_space(X, y, label='Classes'):   
-    colors = ['#1F77B4', '#FF7F0E']
-    markers = ['o', 's']
-    for l, c, m in zip(np.unique(y), colors, markers):
-        plt.scatter(
-            X[y==l, 0],
-            X[y==l, 1],
-            c=c, label=l, marker=m
-        )
-    plt.title(label)
-    plt.legend(loc='upper right')
-    plt.show()
+from scipy.stats import ttest_ind, ttest_rel
 
 class Sampler:
     def __init__(self, ratio, random_state):
@@ -59,18 +47,15 @@ print('Class 0:', target_count[0])
 print('Class 1:', target_count[1])
 print('Proportion:', round(target_count[0] / target_count[1], 2), ': 1')
 
-ratio=0.6
+ratio=0.7
 random = RandomOverSampler(sampling_strategy=ratio)
 X_rd, y_rd = random.fit_resample(X, y)
 
 smote = SMOTE(sampling_strategy=ratio)
 X_sm, y_sm = smote.fit_resample(X, y)
 
-sampler = Sampler(ratio=0.5, random_state=12345)
+sampler = Sampler(ratio=0.7, random_state=12345)
 X_sam, y_sam = sampler.fit_resample(X,y)
-
-#plot_2d_space(X, y, "Dane")
-#plot_2d_space(X_rd, y_rd, 'Resampled
 
 dataresample=pd.DataFrame(y_sam)
 resample_count = dataresample.value_counts()
@@ -83,8 +68,12 @@ plt.show()
 resample_count.plot(kind='bar', title='Po')
 plt.show()
 
-rkf = StratifiedKFold(n_splits=2, shuffle=True, random_state=1234)
-scores = []
+
+n_splits = 2
+n_repeats = 5
+
+rkf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats)
+scores = np.array([])
 clf = GaussianNB()
 
 for train_index, test_index in rkf.split(X, y):
@@ -93,8 +82,57 @@ for train_index, test_index in rkf.split(X, y):
     X_resampled, y_resampled = sampler.fit_resample(X_train, y_train)
     clf.fit(X_resampled, y_resampled)
     predict = clf.predict(X_test)
-    scores.append(f1_score(y_test, predict))
+    scores = np.append(scores, f1_score(y_test, predict))
 
 mean_score = np.mean(scores)
 std_score = np.std(scores)
+
 print("F1 score: %.3f (%.3f)" % (mean_score, std_score))
+
+np.save('scores.npy', scores)
+
+random_scores = np.array([])
+smote_scores = np.array([])
+
+for train_index, test_index in rkf.split(X, y):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    
+    X_resampled_rd, y_resampled_rd = sampler.fit_resample(X_train, y_train)
+    clf.fit(X_resampled_rd, y_resampled_rd)
+    predict = clf.predict(X_test)
+    random_scores = np.append(random_scores, f1_score(y_test, predict))
+    
+    X_resampled_sm, y_resampled_sm = smote.fit_resample(X_train, y_train)
+    clf.fit(X_resampled_sm, y_resampled_sm)
+    predict = clf.predict(X_test)
+    smote_scores = np.append(smote_scores, f1_score(y_test, predict))
+
+
+scores_combo = np.column_stack((random_scores, smote_scores))
+
+num_classifiers = scores_combo.shape[1]
+t_statistic_matrix = np.zeros((num_classifiers, num_classifiers))
+p_value_matrix = np.zeros((num_classifiers, num_classifiers))
+advantage_matrix = np.zeros((num_classifiers, num_classifiers), dtype=bool)
+
+for i in range(num_classifiers):
+    for j in range(num_classifiers):
+            t_statistic, p_value = ttest_rel(scores_combo[:, i], scores_combo[:, j])
+            t_statistic_matrix[i, j] = t_statistic
+            p_value_matrix[i, j] = p_value
+            advantage_matrix[i, j] = np.mean(scores_combo[:, i]) > np.mean(scores_combo[:, j])
+
+alpha = 0.05
+significant_advantage_matrix = (p_value_matrix < alpha)
+statistical_advantage_matrix = advantage_matrix * significant_advantage_matrix
+
+print(t_statistic_matrix)
+print(' ')
+print(p_value_matrix)
+print(' ')
+print(advantage_matrix)
+print(' ')
+print(significant_advantage_matrix)
+print(' ')
+print(statistical_advantage_matrix)
