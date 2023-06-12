@@ -89,12 +89,6 @@ for train_index, test_index in rkf.split(X, y):
     predict = clf.predict(X_test)
     scores = np.append(scores, f1_score(y_test, predict))
 
-mean_score = np.mean(scores)
-std_score = np.std(scores)
-
-#print("F1 score: %.3f (%.3f)" % (mean_score, std_score))
-
-np.save('scores.npy', scores)
 
 random_scores = np.array([])
 smote_scores = np.array([])
@@ -116,6 +110,9 @@ for train_index, test_index in rkf.split(X, y):
 
 scores_combo = np.column_stack((random_scores, smote_scores))
 
+np.save('scores.npy', scores_combo)
+
+
 num_classifiers = scores_combo.shape[1]
 t_statistic_matrix = np.zeros((num_classifiers, num_classifiers))
 p_value_matrix = np.zeros((num_classifiers, num_classifiers))
@@ -132,6 +129,11 @@ alpha = 0.05
 significant_advantage_matrix = (p_value_matrix < alpha)
 statistical_advantage_matrix = advantage_matrix * significant_advantage_matrix
 
+mean_score = np.mean(random_scores)
+std_score = np.std(random_scores)
+mean_scores = np.mean(smote_scores)
+std_scores = np.std(smote_scores)
+
 print("DANE SYSTETYCZNE:")
 print(' ')
 print(t_statistic_matrix)
@@ -143,6 +145,8 @@ print(' ')
 print(significant_advantage_matrix)
 print(' ')
 print(statistical_advantage_matrix)
+print("F1 score: %.3f (%.3f)" % (mean_score, std_score))
+print("F1 score(smote): %.3f (%.3f)" % (mean_scores, std_scores))
 
 random_scores2 = np.array([])
 smote_scores2 = np.array([])
@@ -180,6 +184,11 @@ alpha = 0.05
 significant_advantage_matrix2 = (p_value_matrix2 < alpha)
 statistical_advantage_matrix2 = advantage_matrix2 * significant_advantage_matrix2
 
+mean_score1 = np.mean(random_scores2)
+std_score1 = np.std(random_scores2)
+mean_scores1 = np.mean(smote_scores2)
+std_scores1 = np.std(smote_scores2)
+
 print("DANE RZECZYWISTE:")
 print(' ')
 print(t_statistic_matrix2)
@@ -191,3 +200,5 @@ print(' ')
 print(significant_advantage_matrix2)
 print(' ')
 print(statistical_advantage_matrix2)
+print("F1 score: %.3f (%.3f)" % (mean_score1, std_score1))
+print("F1 score(smote): %.3f (%.3f)" % (mean_scores1, std_scores1))
